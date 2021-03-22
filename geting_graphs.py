@@ -123,36 +123,42 @@ def DetachmentWindow(Bx_Bt, zx,L, beta):
 
     return delta_n
 
-def qi_qf(Bx_Bt,zxRelativ):
+def qi_qf(Bx_Bt,zxRelativ,coulomb,path):
     
     
     Tc=5
     Th=65
-    nu=1e20
+    nu_x=1e20
     fI=0.04
     L=26.5
     zh=np.arange(0,L,0.01)
     zx=zxRelativ*L
     me = 9.1093837015*1e-31
-    coulomb =10
+   # coulomb =10
 
-    tau, kappa_par = thermalconductivity(nu,me, coulomb)
+    tau, kappa_par = thermalconductivity(nu_x,me, coulomb)
     U =U_func( Tc,Th, kappa_par)
-    S0=S0x_func(L,zx, U,fI,nu)
+    S0=S0x_func(L,zx, U,fI,nu_x)
     
     qi= qi_func(zh,S0,L,zx)
 
     B_Bx=B_Bx_funx(zh, zx,Bx_Bt)
     Tu =Tu_func(S0,L,zx,kappa_par,zh, B_Bx)
-    qf= qf_func(kappa_par,fI,nu,U, zh,B_Bx,S0,L,zx)
+    qf_x= qf_func(kappa_par,fI,nu_x,U, zh,B_Bx,S0,L,zx)
+    beta= 1
+    delta_n=DetachmentWindow(Bx_Bt, zx,L, beta)
+    nu_t=nu_x/(delta_n+1)
+    qf_t=qf_func(kappa_par,fI,nu_t,U, zh,B_Bx,S0,L,zx)
 
-    return qi, qf, Tu, S0, L,zh, zx, U, B_Bx, kappa_par,nu, fI
+    plot_qi_qf(path,zh,L,qf_x,qf_t,qi,Tu,Bx_Bt)
+    
+    return qi, qf_x,qf_t, Tu, S0, L,zh, zx, U, B_Bx, kappa_par,nu_x,nu_t,delta_n, fI
 
-def plot_qi_qf(path,zh,L,qf,qi,Tu):
+def plot_qi_qf(path,zh,L,qf_x,qf_t,qi,Tu,Bx_Bt):
     plt.rc('font', family='Serif')
     plt.figure(figsize=(8,4.5))
-    plt.plot(zh/L,qf, label=r'qf')
-   # plt.plot(zh/L,qf1, label=r'qf1')
+    plt.plot(zh/L,qf_x, label=r'$qf_{x}$')
+    plt.plot(zh/L,qf_t, label=r'$qf_{t}$')
     plt.plot(zh/L,qi, label=r'qi')
     plt.grid(alpha=0.5)
     plt.xlim(0,1)
@@ -161,8 +167,8 @@ def plot_qi_qf(path,zh,L,qf,qi,Tu):
     plt.xlabel(r'$z_{h}/L$', fontsize=18)
     plt.tick_params('both', labelsize=14)
     plt.tight_layout()
-    plt.legend(fancybox=True, loc='upper right', framealpha=0, fontsize=12)
-    plt.savefig(path+'/qf_qi2.png', dpi=300)
+    plt.legend(fancybox=True, loc='lower right', framealpha=0, fontsize=12)
+    plt.savefig(path+'/qf_qi'+str(Bx_Bt)+'.png', dpi=300)
     plt.show()
 
     plt.rc('font', family='Serif')
@@ -177,7 +183,7 @@ def plot_qi_qf(path,zh,L,qf,qi,Tu):
     plt.tick_params('both', labelsize=14)
     plt.tight_layout()
     plt.legend(fancybox=True, loc='upper right', framealpha=0, fontsize=12)
-    plt.savefig(path+'/Tu2.png', dpi=300)
+    plt.savefig(path+'/Tu'+str(Bx_Bt)+'.png', dpi=300)
     plt.show()
     
     return
@@ -234,7 +240,8 @@ def B_Bx_funx(zh, zx,Bx_Bt):
 def U_func( Tc,Th, kappa_par):
     u = lambda T: T**0.5 * 5.9*1e-34 *(T-1)**0.5 *(80-T)/(1+3.1*1e-3*(T-1)**2)*np.heaviside(80-T,1)*np.heaviside(-1+T,1)
     RadiationInt= quad(u, Tc,Th)
-
+    kB= 8.617333262145*1e-5
+    
     U=7**(2/7) *(2 *kappa_par)**(3/14) * np.sqrt(RadiationInt[0])
 
     return U
@@ -267,6 +274,7 @@ def Tu_func(S0,L,zx,kappa_par,zh, B_Bx):
     
 
 def thermalconductivity(n,me, coulomb):
+    kB= 8.617333262145*1e-5
     tau=3.5*1e5/(coulomb*n)
     kappa_par= 3.16 * n*tau/me
     #omega=qe*B/me
