@@ -117,17 +117,17 @@ def stability(path):
     return
 
     
-def DetachmentWindow(Bx_Bt, zx,L, beta):
+def DetachmentWindow(Bx_Bt, zx,L, beta,zh=0):
     
-    delta_n =( Bx_Bt * (2*zx/(3* (L-zx)) *(1 + abs(1/Bx_Bt) + (abs(1/Bx_Bt))**2 ) +1 )**(2/7))**beta -1
+    delta_n =( Bx_Bt * (2*(zx-zh)/(3* (L-zx)) *(1 + abs(1/Bx_Bt) + (abs(1/Bx_Bt))**2 ) +1 )**(2/7))**beta -1
 
     return delta_n
 
 def qi_qf(Bx_Bt,zxRelativ,coulomb,path):
     
     
-    Tc=5
-    Th=65
+    #Tc=5
+    #Th=65
     nu_x=1e20
     fI=0.04
     L=26.5
@@ -137,7 +137,7 @@ def qi_qf(Bx_Bt,zxRelativ,coulomb,path):
    # coulomb =10
 
     tau, kappa_par = thermalconductivity(nu_x,me, coulomb)
-    U =U_func( Tc,Th, kappa_par)
+    U =U_func( 5,65, kappa_par)
     S0=S0x_func(L,zx, U,fI,nu_x)
     
     qi= qi_func(zh,S0,L,zx)
@@ -154,11 +154,11 @@ def qi_qf(Bx_Bt,zxRelativ,coulomb,path):
     
     return qi, qf_x,qf_t, Tu, S0, L,zh, zx, U, B_Bx, kappa_par,nu_x,nu_t,delta_n, fI
 
-def plot_qi_qf(path,zh,L,qf_x,qf_t,qi,Tu,Bx_Bt):
+def plot_qi_qf(path,zh,L,qf_t,qi,Tu,Bx_Bt):
     plt.rc('font', family='Serif')
     plt.figure(figsize=(8,4.5))
-    plt.plot(zh/L,qf_x, label=r'$qf_{x}$')
-    plt.plot(zh/L,qf_t, label=r'$qf_{t}$')
+   # plt.plot(zh/L,qf_x, label=r'$qf_{x}$')
+    plt.plot(zh/L,qf_t, label=r'$qf$')
     plt.plot(zh/L,qi, label=r'qi')
     plt.grid(alpha=0.5)
     plt.xlim(0,1)
@@ -171,35 +171,115 @@ def plot_qi_qf(path,zh,L,qf_x,qf_t,qi,Tu,Bx_Bt):
     plt.savefig(path+'/qf_qi'+str(Bx_Bt)+'.png', dpi=300)
     plt.show()
 
-    plt.rc('font', family='Serif')
-    plt.figure(figsize=(8,4.5))
-    plt.plot(zh/L,Tu, label=r'$T_{u}$')
+    #plt.rc('font', family='Serif')
+    #plt.figure(figsize=(8,4.5))
+    #plt.plot(zh/L,Tu, label=r'$T_{u}$')
 
-    plt.grid(alpha=0.5)
-    plt.xlim(0,1)
-    plt.ylim(0)
-    plt.ylabel(r'T in [eV]', fontsize=18)
-    plt.xlabel(r'$z_{h}/L$', fontsize=18)
-    plt.tick_params('both', labelsize=14)
-    plt.tight_layout()
-    plt.legend(fancybox=True, loc='upper right', framealpha=0, fontsize=12)
-    plt.savefig(path+'/Tu'+str(Bx_Bt)+'.png', dpi=300)
-    plt.show()
+    #plt.grid(alpha=0.5)
+    #plt.xlim(0,1)
+    #plt.ylim(0)
+    #plt.ylabel(r'T in [eV]', fontsize=18)
+    #plt.xlabel(r'$z_{h}/L$', fontsize=18)
+    #plt.tick_params('both', labelsize=14)
+    #plt.tight_layout()
+    #plt.legend(fancybox=True, loc='upper right', framealpha=0, fontsize=12)
+    #plt.savefig(path+'/Tu'+str(Bx_Bt)+'.png', dpi=300)
+    #plt.show()
     
     return
+
+
+def q_func(Bx_Bt, Tu=110, zxRelativ=0.2, nu_x=1e20, fI=0.04,  L=26.5, zhRelativ=0.1):
+    """treat S0x as a dependent parameter to a given nux and fIx"""
+    me = 9.1093837015*1e-31
+    coulomb =10
+
+    z= np.arange(0,L,0.01)
+    zh=zhRelativ*L
+    zx=zxRelativ*L
+    if zh> zx:
+        print('unstable zh>zx')
+        return
+
+    B_Bx=B_Bx_funx(z, zx,Bx_Bt)
+    B_Bx_zh =B_Bx[np.where(z==np.round(zh,2))]
+
+    tau, kappa_par = thermalconductivity(nu_x,me, coulomb)
+    U =U_func(5,65, kappa_par)
+    S0x= S0x_func2(L,zx,fI,nu_x,Tu,kappa_par,U)
+    #S0x=S0x_func(L,zx, U,fI,nu_x)
+
+    #keep fI and SO constant vary only nu(zh)
+    beta= 1
+    delta_nh=DetachmentWindow(1/B_Bx_zh, zx,L, beta,zh)
+    nu_h=nu_x/(delta_nh+1)
+
+    qi= qi_zh(zh,S0x,L,zx)
+    qf=qf_zh(kappa_par,fI,nu_h,U, zh,B_Bx_zh,S0x,L,zx)
+
+    Tu_zh =Tuupstream(S0x,L,zx,kappa_par,zh,B_Bx_zh)
+   # plot_qi_qf(path,z,L,qf,qi,Bx_Bt)
+
+    T= np.zeros(z.shape[0])
+    for ii in range(z.shape[0]):
+        if (z[ii]>=zh):
+            if (z[ii]>= zx):
+                T[ii]=(Tu**(7/2)-7*S0x/(4*kappa_par) *(L-z[ii])**2)**(2/7)
+            elif (z[ii]<zx):
+                T[ii]= (Tu**(7/2) -(7*S0x*(L-zx)/(2*kappa_par))*((zx-z[ii])/3 * (1 + abs(B_Bx[ii]) +(abs(B_Bx[ii]))**2 ) + (L-zx)/2))**(2/7)
+            else:
+                print(error)
+                return
+            
+        elif (z[ii]<zh):
+            
+            T[ii]= Tfront(z[ii])
+        else:
+            print(error2)
+
+    H= np.zeros(z.shape[0])       
+    for ii in range(z.shape[0]):
+        if (z[ii]<zh):  
+            H[ii]= nu_h**2 * Tu**2 * fI * Q(T[ii])/T[ii]**2
+        else:
+            if (z[ii]<zx):
+                H[ii]= 0
+            else:
+                H[ii]=S0x
+    
+    
+
+    return Tu,Tu_zh, T, H, nu_h, S0x, z, zx, zh, qi,qf,fI, L,kappa_par
+ 
+
+def Tfront(z):
+    
+    T=1
+    return
+
+ 
 
 def S0x_func(L,zx,U,fI,nu):
     S0x=1/(L-zx)*(U*np.sqrt(fI)*nu*((L-zx)/2)**(2/7))**(7/5)
     return S0x
 
+def S0x_func2(L,zx,fI,nu,Tu,kappa_par,U):
+    S0x=1/(L-zx)* np.sqrt(fI)*nu*Tu*(2*kappa_par)**(4/14) *U
+    return S0x
+    
 def qi_func(zh, S0,L,zx):
     qi=np.zeros(zh.shape[0])
     
     for ii in range(zh.shape[0]):
-        if (zh[ii]<zx):  
-            qi[ii]=- S0*(L - zx)
-        else:
-            qi[ii]= -S0*(L - zh[ii])
+        qi[ii]=qi_zh(zh[ii],S0,L,zx)
+
+    return qi
+
+def qi_zh(zh,S0,L,zx):
+    if (zh<zx):  
+        qi=- S0*(L - zx)
+    else:
+        qi= -S0*(L - zh)
 
     return qi
 
@@ -208,14 +288,21 @@ def qf_func(kappa_par,fI,nu,U, zh, B_Bx,S0,L,zx):
 
     qf=np.zeros(zh.shape[0])
     for ii in range(zh.shape[0]):
-        if (zh[ii]<zx):
-            qf[ii] = -U *np.sqrt(fI) *nu * 1/B_Bx[ii] *(S0 *(L-zx))**(2/7) *  ((zx-zh[ii])/3 *(1 + abs(B_Bx[ii]) +(abs(B_Bx[ii]))**2 ) + (L-zx)/2)**(2/7)
-        else:
-            qf[ii] = -U * np.sqrt(fI) * nu * 1/B_Bx[ii] * (S0/2)**(2/7) *(L-zh[ii])**(4/7)
+        qf[ii]=qf_zh(kappa_par,fI,nu,U,zh[ii],B_Bx[ii],S0,L,zx)
+
+    return qf
+
+def qf_zh(kappa_par,fI,nu,U,zh,B_Bx,S0,L,zx):
+    if (zh<zx):
+        qf = -U *np.sqrt(fI) *nu * 1/B_Bx *(S0 *(L-zx))**(2/7) *  ((zx-zh)/3 *(1 + abs(B_Bx) +(abs(B_Bx))**2 ) + (L-zx)/2)**(2/7)
+    else:
+        qf = -U * np.sqrt(fI) * nu * 1/B_Bx * (S0/2)**(2/7) *(L-zh)**(4/7)
+            
     return qf
 
 def Q(T=np.arange(0,120,0.1)):
-
+    
+    
     Q= 5.9*1e-34 *(T-1)**0.5 *(80-T)/(1+3.1*1e-3*(T-1)**2)*np.heaviside(80-T,1)*np.heaviside(-1+T,1)
     
 
@@ -252,10 +339,15 @@ def Tu_func(S0,L,zx,kappa_par,zh, B_Bx):
 
     Tu=np.zeros(zh.shape[0])
     for ii in range(zh.shape[0]):
-        if (zh[ii]<zx):  
-            Tu[ii]=(7*S0*( L-zx)/(2*kappa_par))**(2/7) * ((zx-zh[ii])/3 *(1 + abs(B_Bx[ii]) +(abs(B_Bx[ii]))**2 ) + (L-zx)/2)**(2/7)
-        else:
-            Tu[ii]= (7*S0/(4*kappa_par))**(2/7) *(L-zh[ii])**(4/7)
+        Tu[ii]=Tupstream(So,L,zx,kappa_par,zh[ii],B_Bx[ii])
+
+    return Tu
+
+def Tuupstream(S0,L,zx,kappa_par,zh,B_Bx_zh):
+    if (zh<zx):  
+        Tu=(7*S0*( L-zx)/(2*kappa_par))**(2/7) * ((zx-zh)/3 *(1 + abs(B_Bx_zh) +(abs(B_Bx_zh))**2 ) + (L-zx)/2)**(2/7)
+    else:
+        Tu= (7*S0/(4*kappa_par))**(2/7) *(L-zh)**(4/7)
 
     return Tu
 
