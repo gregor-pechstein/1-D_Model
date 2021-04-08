@@ -17,15 +17,16 @@ def PoincarePlot(config,tracer,machine,pos,numPoints=300,phi=0, plotPoin=False):
 
 
     if (plotPoin==True):    
+        path="/home/grepeloc/Simulation/1-D_Model/"
         plt.rc('font', family='Serif')
         plt.figure() #figsize=(8,4.5))
         for i in range(0, len(res.surfs)):
-            plt.scatter(res.surfs[i].points.x1, res.surfs[i].points.x3, color="red", s=0.1)
+            c=np.sqrt(np.array(res.surfs[i].points.x1)**2+np.array(res.surfs[i].points.x2)**2)
+            plt.scatter(c, res.surfs[i].points.x3, color="red", s=0.1)
+            #plt.scatter(res.surfs[i].points.x1, res.surfs[i].points.x3, color="red", s=0.1)
             plt.axis('equal')
-            path="/home/grepeloc/Simulation/1-D_Model/"
-
-            plt.savefig(path+'/Poincare'+str(phi)+'.png', dpi=300)
-            plt.show()
+        #plt.savefig(path+'/Poincare'+str(phi)+'.png', dpi=300)
+        plt.show()
 
     return res
 
@@ -139,9 +140,12 @@ def B_connection_allong_line():
     MagChara_XLine = MagCharacteristic(config,tracer,XLine.lines[0].vertices)
     phi=np.zeros(len(MagChara_XLine.characteristics))
     theta=np.zeros(len(MagChara_XLine.characteristics))
+    reff=np.zeros(len(MagChara_XLine.characteristics))
     for ii in range(0, len(MagChara_XLine.characteristics)):
         phi[ii]= MagChara_XLine.characteristics[ii].phi0
         theta[ii]= MagChara_XLine.characteristics[ii].theta0
+        reff[ii]= MagChara_XLine.characteristics[ii].reff
+        
 
 
     ######taking a point in the island( a small stepp away from the Xpoint to trace the fildline in the island"
@@ -163,12 +167,31 @@ def B_connection_allong_line():
 
     B,B_abs = Magneticfield(config,tracer,IslandTrace.lines[0].vertices)
 
-    B_x,Bx_abs = Magneticfield(config,tracer,XLine.lines[0].vertices)
+    B_x,Bx_abs = Magneticfield(config,tracer,XPoint.xpoints)
 
 
-    Conlengh_x_fwd, Conlengh_x_bwd= Conection_lenght(config,tracer,machine,x_start)
-    Conlengh_I_fwd, Conlengh_I_bwd =Conection_lenght(config,tracer,machine,Island_pos)
+    #Conlengh_x_fwd, Conlengh_x_bwd= Conection_lenght(config,tracer,machine,x_start)
+    Conlengh_x_fwd, Conlengh_x_bwd= Conection_lenght(config,tracer,machine,Island_pos)
+    Conlengh_I_fwd, Conlengh_I_bwd =Conection_lenght(config,tracer,machine,IslandTrace.lines[0].vertices)
+
+    length_fwd= np.zeros(len(Conlengh_I_fwd.connection))
+    length_bwd= np.zeros(len(Conlengh_I_bwd.connection))
+    for i in range(0, len(Conlengh_I_fwd.connection)):
+        length_fwd[i]= Conlengh_I_fwd.connection[i].length
+        length_bwd[i]=Conlengh_I_bwd.connection[i].length
+
+    idx = np.argwhere(np.diff(np.sign(length_bwd - length_fwd))).flatten()
+    L=length_bwd[idx[0]]
+    zx= length_bwd[0]
+
+    figurePloting(Poin_Island,Poin_sep,XPoint,SepTrace,XLine,IslandTrace,B_abs,Bx_abs,lineTask_x, lineTask_Island,path)
     
+        
+    return Sep,sep_pos,B_x,Bx_abs, B,B_abs,Conlengh_x_fwd, Conlengh_x_bwd,Conlengh_I_fwd, Conlengh_I_bwd, XPoint, XLine,SepTrace, traceLengh_x,traceLengh,Poin_Island,IslandTrace
+
+
+
+def figurePloting(Poin_Island,Poin_sep,XPoint,SepTrace,XLine,IslandTrace,B_abs,Bx_abs,lineTask_x, lineTask_Island,path):
     
 
     ''' plot the points: '''
@@ -190,21 +213,14 @@ def B_connection_allong_line():
     plt.legend(fancybox=True, loc='lower right', framealpha=0, fontsize=12)
     plt.savefig(path+'/Poincare.png', dpi=300)
     plt.show()
-    
 
-
-
-    
     # plt.rc('font', family='Serif')
     # plt.figure()
-    # plt.axis([-7.0, 7.0, -5.5, 5.5])
-
- 
+    # plt.axis([-7.0, 7.0, -5.5, 5.5]) 
     #  for i in range(0, len(SepTrace.lines)):
     #     plt.scatter(SepTrace.lines[i].vertices.x1, SepTrace.lines[i].vertices.x2,color="red", s=0.01,alpha=0.3)
     # for i in range(0, len(XLine.lines)):
     #     plt.scatter(XLine.lines[i].vertices.x1, XLine.lines[i].vertices.x2,color ="black", s=1)
-
     # plt.scatter(IslandTrace.lines[i].vertices.x1, IslandTrace.lines[i].vertices.x3,color ="blue", s=1)
     # plt.axis('equal')
     # plt.grid(alpha=0.5)
@@ -228,8 +244,6 @@ def B_connection_allong_line():
 
     plt.show()
                     
-
-
 
     traceLengh=np.arange(0, (lineTask_Island.numSteps+1) * task_Island.step,task_Island.step)
     plt.rc('font', family='Serif')
@@ -257,9 +271,8 @@ def B_connection_allong_line():
     plt.savefig(path+'/Bx_abs.png', dpi=300)
     plt.show()
 
-    
-    return Sep,sep_pos,B_x,Bx_abs, B,B_abs,Conlengh_x_fwd, Conlengh_x_bwd,Conlengh_I_fwd, Conlengh_I_bwd, XPoint, XLine,SepTrace, traceLengh_x,traceLengh,Poin_Island,IslandTrace
 
+    return
 
 
 
@@ -290,7 +303,7 @@ def Grid():
     machine.grid.ZMin, machine.grid.ZMax = -1.5,1.5
     machine.grid.YMin, machine.grid.YMax = -7, 7
     machine.grid.XMin, machine.grid.XMax = -7, 7
-    #machine.meshedModelsIds = [165]
+    #machine.meshedModelsIds = [164]
     machine.assemblyIds = [2]
 
     return machine, config,tracer
